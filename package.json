@@ -1,0 +1,18 @@
+{
+  "name": "slides-extractor",
+  "version": "0.1.0",
+  "description": "Turns a conference talk recording into a readable blog post with extracted slides, using local models in the browser.",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "detect": "node lib/cli.js"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "^4.4.0-next.1"
+  }
+}

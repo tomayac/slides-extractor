@@ -1,0 +1,74 @@
+<!doctype html>
+<!--
+  SPDX-FileCopyrightText: 2026 Thomas Steiner
+  SPDX-License-Identifier: Apache-2.0
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Blog post</title>
+    <link rel="icon" href="icon.svg" />
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      body {
+        padding: 0 16px 48px;
+      }
+
+      .post {
+        max-width: 980px;
+        margin: 24px auto 0;
+      }
+
+      .read-bar {
+        max-width: 980px;
+        margin: 16px auto 0;
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        font-size: 0.875rem;
+      }
+    </style>
+    <script type="module">
+      // Shows a job's post on its own, for reading. Same rendering as the
+      // app and the HTML download, with assets served from the server.
+      import { renderPost } from './js/export.js';
+
+      const id = new URLSearchParams(location.search).get('v');
+      const [job, results] = await Promise.all([
+        fetch(`/api/jobs/${encodeURIComponent(id)}`).then((r) => r.json()),
+        fetch(`/api/jobs/${encodeURIComponent(id)}/results`).then((r) =>
+          r.json(),
+        ),
+      ]);
+      const post = document.querySelector('.post');
+      if (!results.post?.sections?.length) {
+        post.innerHTML =
+          '<p>This talk has no post yet. Write it in the app first.</p>';
+      } else {
+        const base = `/data/${job.id}/`;
+        post.innerHTML = renderPost(
+          job,
+          results.post,
+          results.slideInfo || {},
+          {
+            anim: results.settings?.anim || 'auto',
+            asset: (p) => `${base}${p}?v=${job.slidesVersion || ''}`,
+          },
+        );
+        document.title = results.post.title || job.title;
+      }
+      document.querySelector('#back').href = `./?v=${encodeURIComponent(id)}`;
+      document.querySelector('#slides').href =
+        `present.html?v=${encodeURIComponent(id)}`;
+    </script>
+  </head>
+  <body>
+    <nav class="read-bar">
+      <a id="back" href="./">← Back to the app</a>
+      <a id="slides" href="present.html">Present the slides</a>
+    </nav>
+    <article class="post"><p class="muted">Loading…</p></article>
+  </body>
+</html>

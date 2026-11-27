@@ -1,0 +1,52 @@
+<!doctype html>
+<!--
+  SPDX-FileCopyrightText: 2026 Thomas Steiner
+  SPDX-License-Identifier: Apache-2.0
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Slides</title>
+    <style>
+      html {
+        background: #0d0e10;
+        color: #eee;
+        font:
+          16px system-ui,
+          sans-serif;
+      }
+    </style>
+    <script type="module">
+      // Presents a job's slides: builds the same deck as the download, with
+      // assets served from the server instead of inlined.
+      import { deckPage, isIncluded } from './js/export.js';
+
+      const id = new URLSearchParams(location.search).get('v');
+      const [job, results] = await Promise.all([
+        fetch(`/api/jobs/${encodeURIComponent(id)}`).then((r) => r.json()),
+        fetch(`/api/jobs/${encodeURIComponent(id)}/results`).then((r) =>
+          r.json(),
+        ),
+      ]);
+      const slides = job.slides.filter((s) => isIncluded(s, results));
+      const html = await deckPage(
+        job,
+        results.post,
+        results.slideInfo || {},
+        slides,
+        {
+          base: new URL(`/data/${job.id}/`, location.href).href,
+          inline: false,
+          anim: results.settings?.anim || 'auto',
+        },
+      );
+      document.open();
+      document.write(html);
+      document.close();
+    </script>
+  </head>
+  <body>
+    <p>Loading slides…</p>
+  </body>
+</html>

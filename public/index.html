@@ -1,0 +1,233 @@
+<!doctype html>
+<!--
+  SPDX-FileCopyrightText: 2026 Thomas Steiner
+  SPDX-License-Identifier: Apache-2.0
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Slides Extractor</title>
+    <link rel="icon" href="icon.svg" />
+    <link rel="stylesheet" href="styles.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "@huggingface/transformers": "/vendor/@huggingface/transformers/dist/transformers.web.js",
+          "onnxruntime-web/webgpu": "/vendor/onnxruntime-web/dist/ort.webgpu.bundle.min.mjs",
+          "onnxruntime-common": "/js/ort-common-shim.js"
+        }
+      }
+    </script>
+    <script type="module" src="js/app.js"></script>
+  </head>
+  <body>
+    <header class="app-header">
+      <a class="brand" href="./"
+        ><img src="icon.svg" alt="" width="28" height="28" />Slides Extractor</a
+      >
+      <span class="badges">
+        <span id="badge-webgpu" class="badge">WebGPU</span>
+        <span
+          id="badge-cos"
+          class="badge"
+          title="Cross-Origin Storage: model files are shared across sites"
+          >COS</span
+        >
+      </span>
+    </header>
+
+    <main>
+      <section id="start" class="panel">
+        <h1>Read a talk instead of watching it</h1>
+        <p class="lede">
+          Paste a conference talk recording. The server downloads it and
+          extracts the slides; Gemma&nbsp;4 and Whisper then transcribe and
+          write it up as a blog post, right here in your browser.
+        </p>
+        <form id="url-form" class="url-form">
+          <input
+            id="url"
+            type="url"
+            required
+            placeholder="https://www.youtube.com/watch?v=…"
+            aria-label="Video URL"
+          />
+          <button type="submit">Extract</button>
+        </form>
+        <p id="url-error" class="error" hidden></p>
+        <div id="jobs" class="jobs"></div>
+      </section>
+
+      <section id="job" class="panel" hidden>
+        <div class="job-head">
+          <img id="job-thumb" class="job-thumb" alt="" />
+          <div>
+            <h2 id="job-title"></h2>
+            <p id="job-meta" class="muted"></p>
+          </div>
+        </div>
+
+        <ol class="steps">
+          <li id="step-media" class="step">
+            <div class="step-head">
+              <span class="step-name">Media</span
+              ><span class="step-status"></span>
+            </div>
+            <p class="step-detail muted">
+              Download, audio, slide region, and slide changes (Node.js, ffmpeg)
+            </p>
+            <progress max="1" value="0" hidden></progress>
+          </li>
+          <li id="step-asr" class="step">
+            <div class="step-head">
+              <span class="step-name">Transcribe</span
+              ><span class="step-status"></span>
+              <button class="run" data-step="asr" disabled>Transcribe</button>
+            </div>
+            <p class="step-detail muted"></p>
+            <progress max="1" value="0" hidden></progress>
+          </li>
+          <li id="step-slides" class="step">
+            <div class="step-head">
+              <span class="step-name">Read slides</span
+              ><span class="step-status"></span>
+              <button class="run" data-step="slides" disabled>
+                Read slides
+              </button>
+            </div>
+            <p class="step-detail muted">
+              Gemma&nbsp;4 looks at every slide: is it a slide, its title, and
+              its text
+            </p>
+            <progress max="1" value="0" hidden></progress>
+          </li>
+          <li id="step-write" class="step">
+            <div class="step-head">
+              <span class="step-name">Write</span
+              ><span class="step-status"></span>
+              <button class="run" data-step="write" disabled>Write post</button>
+            </div>
+            <p class="step-detail muted">
+              Gemma&nbsp;4 cleans up the transcript and writes the post, section
+              by section
+            </p>
+            <progress max="1" value="0" hidden></progress>
+          </li>
+        </ol>
+
+        <details class="settings">
+          <summary>Models and settings</summary>
+          <div class="settings-grid">
+            <label
+              >Speech recognition
+              <select id="set-asr">
+                <option value="whisper-large-v3-turbo">
+                  Whisper large-v3 turbo (timestamps, ~1.5 GB)
+                </option>
+                <option value="whisper-base">
+                  Whisper base (fast, ~0.2 GB)
+                </option>
+                <option value="gemma">
+                  Gemma 4 audio (one model for all, coarser timing)
+                </option>
+              </select>
+            </label>
+            <label
+              >Language
+              <select id="set-lang">
+                <option value="en">English</option>
+                <option value="de">German</option>
+                <option value="fr">French</option>
+                <option value="es">Spanish</option>
+                <option value="it">Italian</option>
+                <option value="nl">Dutch</option>
+                <option value="pt">Portuguese</option>
+                <option value="ja">Japanese</option>
+              </select>
+            </label>
+            <label
+              >Gemma 4
+              <select id="set-gemma">
+                <option value="onnx-community/gemma-4-E2B-it-ONNX">
+                  E2B (~3.4 GB)
+                </option>
+                <option value="onnx-community/gemma-4-E4B-it-ONNX">
+                  E4B (~5.2 GB, better writing)
+                </option>
+              </select>
+            </label>
+            <label
+              >Animations
+              <select id="set-anim">
+                <option value="auto">
+                  Video for motion, animated WebP for builds
+                </option>
+                <option value="webp">Animated WebP everywhere</option>
+                <option value="static">Still images only</option>
+              </select>
+            </label>
+            <label
+              >Slide change sensitivity
+              <input
+                id="set-sensitivity"
+                type="range"
+                min="0.06"
+                max="0.4"
+                step="0.02"
+                value="0.18"
+              />
+              <span class="muted small"
+                >Higher means fewer, bigger slide changes.
+                <button id="redetect" class="link">Detect again</button></span
+              >
+            </label>
+          </div>
+        </details>
+
+        <details id="review" class="review">
+          <summary>Slides <span id="slide-count" class="muted"></span></summary>
+          <p class="muted small">
+            Untick anything that isn't a slide. Click a slide to play the
+            recording from there.
+          </p>
+          <div id="layout-info" class="muted small"></div>
+          <video id="player" controls preload="metadata" hidden></video>
+          <div id="slide-grid" class="slide-grid"></div>
+        </details>
+
+        <details id="transcript-box" class="review">
+          <summary>
+            Transcript <span id="transcript-count" class="muted"></span>
+          </summary>
+          <div id="transcript" class="transcript"></div>
+        </details>
+
+        <div class="exports">
+          <button id="export-html" disabled>Download post (HTML)</button>
+          <button id="export-md" disabled>
+            Download post (Markdown + images, ZIP)
+          </button>
+          <button id="export-deck" disabled>Download slides (HTML deck)</button>
+          <button id="open-post" class="secondary" disabled>
+            Open post in new tab
+          </button>
+          <button id="open-deck" class="secondary" disabled>
+            Present slides
+          </button>
+        </div>
+      </section>
+
+      <p id="post-tools" class="post-tools" hidden>
+        <a id="post-link" target="_blank">Open the post in a new tab ↗</a>
+      </p>
+      <article id="post" class="post" hidden></article>
+    </main>
+    <footer class="app-footer muted small">
+      Models run locally with Transformers.js on WebGPU. With Cross-Origin
+      Storage, model files download once and are shared with every site that
+      uses them.
+    </footer>
+  </body>
+</html>
